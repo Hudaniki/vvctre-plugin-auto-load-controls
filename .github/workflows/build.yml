@@ -1,0 +1,50 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [windows-2019, ubuntu-18.04]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            cl.exe //LD //Fe:auto-load-controls.dll plugin.cpp
+          else
+            g++ plugin.cpp -shared -o auto-load-controls.so -fPIC
+          fi
+      - name: Prepare to upload (push)
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE
+          export VERSION=$(cat version.txt)
+          echo ::set-env name=VERSION::$VERSION
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            7z a ${{github.event.repository.name}}-$VERSION-${{runner.os}}.7z auto-load-controls.dll license.txt
+          else
+            7z a ${{github.event.repository.name}}-$VERSION-${{runner.os}}.7z auto-load-controls.so license.txt
+          fi
+      - name: Upload (push)
+        if: github.event_name == 'push'
+        uses: JantHsueh/upload-file-action@master
+        with:
+          url: ${{secrets.DISCORD_WEBHOOK}}
+          forms: "{}"
+          fileForms: '{"file": "${{github.event.repository.name}}-${{env.VERSION}}-${{runner.os}}.7z"}'
+      - name: Upload (pull request)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v1
+        with:
+          name: ${{github.event.repository.name}}-${{runner.os}}
+          path: .
