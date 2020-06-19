@@ -1,6 +1,12 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    tags:
+      - "*"
+  pull_request:
+    branches:
+      - "*"
 
 jobs:
   build:
@@ -11,38 +17,38 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-        with:
-          submodules: recursive
       - uses: ilammy/msvc-dev-cmd@v1
       - name: Build
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE
           if [ "$RUNNER_OS" == "Windows" ]; then
-            cl.exe //LD //Fe:auto-load-controls.dll plugin.cpp
+            cl.exe //LD //Fe:${{github.event.repository.name}}.dll plugin.c
           else
-            g++ plugin.cpp -shared -o auto-load-controls.so -fPIC
+            g++ plugin.cpp -shared -o ${{github.event.repository.name}}.so -fPIC
           fi
-      - name: Prepare to upload (push)
+      - name: Prepare to upload
         if: github.event_name == 'push'
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE
-          export VERSION=$(cat version.txt)
+          export VERSION=${GITHUB_REF:10}
           echo ::set-env name=VERSION::$VERSION
           if [ "$RUNNER_OS" == "Windows" ]; then
-            7z a ${{github.event.repository.name}}-$VERSION-${{runner.os}}.7z auto-load-controls.dll license.txt
+            7z a ${{github.event.repository.name}}-$VERSION-${{runner.os}}.7z ${{github.event.repository.name}}.dll license.txt
           else
-            7z a ${{github.event.repository.name}}-$VERSION-${{runner.os}}.7z auto-load-controls.so license.txt
+            7z a ${{github.event.repository.name}}-$VERSION-${{runner.os}}.7z ${{github.event.repository.name}}.so license.txt
           fi
-      - name: Upload (push)
+      - name: Upload to GitHub Releases
         if: github.event_name == 'push'
-        uses: JantHsueh/upload-file-action@master
+        uses: svenstaro/upload-release-action@v1-release
         with:
-          url: ${{secrets.DISCORD_WEBHOOK}}
-          forms: "{}"
-          fileForms: '{"file": "${{github.event.repository.name}}-${{env.VERSION}}-${{runner.os}}.7z"}'
-      - name: Upload (pull request)
+          repo_token: ${{secrets.GITHUB_TOKEN}}
+          file: ${{github.event.repository.name}}-${{env.VERSION}}-${{runner.os}}.7z
+          asset_name: ${{github.event.repository.name}}-${{env.VERSION}}-${{runner.os}}.7z
+          tag: ${{github.ref}}
+          overwrite: true
+      - name: Upload artifact
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v1
         with:
