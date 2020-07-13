@@ -23,7 +23,7 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           if [ "$RUNNER_OS" == "Windows" ]; then
-            cl.exe //LD //Fe:${{github.event.repository.name}}.dll plugin.c
+            cl.exe //LD //Fe:${{github.event.repository.name}}.dll plugin.cpp
           else
             g++ plugin.cpp -shared -o ${{github.event.repository.name}}.so -fPIC
           fi
